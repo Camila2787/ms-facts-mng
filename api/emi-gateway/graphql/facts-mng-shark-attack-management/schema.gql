@@ -1,0 +1,93 @@
+type CommandResponse {
+  "Response code"
+  code: Int
+  "Response message"
+  message: String
+}
+
+type FactsMngSharkAttack {
+  "SharkAttack ID"
+  id: ID!
+  "name"
+  name: String!
+  "organization id"
+  organizationId: String!
+  "SharkAttack description"
+  description: String
+  "SharkAttack active flag"
+  active: Boolean!  
+  "object metadata"
+  metadata: FactsMngSharkAttackMetadata
+}
+
+type FactsMngSharkAttackMetadata {
+    createdBy: String
+		createdAt: BigInt
+		updatedBy: String
+		updatedAt: BigInt
+}
+
+type FactsMngSharkAttackListing {
+  "Listing"
+  listing: [FactsMngSharkAttack]
+  "query total result count"
+  queryTotalResultCount: Int,  
+}
+
+
+input FactsMngSharkAttackFilterInput {
+  "Name"
+  name: String
+  "organization id"
+  organizationId: String!
+  "SharkAttack active flag"
+  active: Boolean
+}
+
+input FactsMngSharkAttackPaginationInput {
+  "Page"
+  page: Int!
+  "Count"
+  count: Int!
+  "query total result count flag"
+  queryTotalResultCount: Boolean
+}
+
+input FactsMngSharkAttackSortInput {
+  field: String!,
+  asc: Boolean!,
+}
+
+input FactsMngSharkAttackInput {
+  "name"
+  name: String
+  "organization id"
+  organizationId: String!
+  "SharkAttack description"
+  description: String
+  "SharkAttack active flag"
+  active: Boolean
+}
+
+
+type Query {
+  "Get SharkAttacks filtered "
+  FactsMngSharkAttackListing(filterInput: FactsMngSharkAttackFilterInput, paginationInput: FactsMngSharkAttackPaginationInput, sortInput: FactsMngSharkAttackSortInput): FactsMngSharkAttackListing
+  "Get SharkAttack by its id"
+  FactsMngSharkAttack(id: ID!, organizationId: String!): FactsMngSharkAttack
+}
+
+type Mutation {
+  "Create a new SharkAttack"
+  FactsMngCreateSharkAttack(input: FactsMngSharkAttackInput!): FactsMngSharkAttack
+  "Update an SharkAttack"
+  FactsMngUpdateSharkAttack(id: ID!, input: FactsMngSharkAttackInput!, merge: Boolean!): FactsMngSharkAttack  
+  "Deletes an SharkAttack"
+  FactsMngDeleteSharkAttacks(ids: [ID]!): CommandResponse  
+}
+
+
+type Subscription {
+  "This events is triggered when a sharkAttack updated or deleted"
+  FactsMngSharkAttackModified(id: ID!): FactsMngSharkAttack
+}

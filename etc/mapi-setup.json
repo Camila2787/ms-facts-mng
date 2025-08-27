@@ -1,8 +1,8 @@
 [
     {
-        "name": "micro-service-template-crud-aggregate",
+        "name": "facts-mng-shark-attack-management",
         "type": "graphql",        
-        "src": "api/emi-gateway/graphql/micro-service-template-crud-aggregate",
+        "src": "api/emi-gateway/graphql/facts-mng-shark-attack-management",
         "preBuildCommands": []
     }
 ]
