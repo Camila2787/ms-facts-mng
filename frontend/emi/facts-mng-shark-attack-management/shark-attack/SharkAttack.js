@@ -1,5 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { TextField, Button, CircularProgress, Paper, Grid } from '@material-ui/core';
+import {
+  TextField,
+  Button,
+  CircularProgress,
+  Paper,
+  Grid,
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
+  Typography,
+} from '@material-ui/core';
 import { useDispatch, useSelector } from 'react-redux';
 import * as Actions from '../store/actions';
 import { withRouter } from 'react-router-dom';
@@ -47,6 +59,11 @@ function SharkAttack(props) {
 
   const [form, setForm] = useState({ ...defaultData });
   const [saving, setSaving] = useState(false);
+
+  // ---- Estado Parte 3 (relacionados) ----
+  const [relatedLoading, setRelatedLoading] = useState(false);
+  const [relatedError, setRelatedError] = useState('');
+  const [related, setRelated] = useState([]); // 5 casos
 
   // LazyQuery para leer detalle cuando el efecto lo indique
   const [readSharkAttack, { data, loading }] = useLazyQuery(
@@ -129,6 +146,40 @@ function SharkAttack(props) {
     }
   }
 
+  // ===== Parte 3: Consulta de datos relacionados (solo frontend) =====
+  async function handleConsultRelated() {
+    setRelatedError('');
+    setRelated([]);
+    setRelatedLoading(true);
+
+    try {
+      const country = (form.country || '').trim();
+      if (!country) {
+        setRelatedError('Para consultar, primero indique el País en el formulario.');
+        setRelatedLoading(false);
+        return;
+      }
+
+      const where = encodeURIComponent("country='" + country.toUpperCase() + "'");
+      const url = "https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/global-shark-attack/records?where=" + where + "&limit=5";
+
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('Respuesta HTTP no OK');
+
+      const json = await resp.json();
+      const results = (json && json.results) ? json.results : [];
+
+      // Delay de 1s para apreciar el loading
+      await new Promise(function (r) { setTimeout(r, 1000); });
+
+      setRelated(results);
+    } catch (err) {
+      setRelatedError('No fue posible consultar casos relacionados.');
+    } finally {
+      setRelatedLoading(false);
+    }
+  }
+
   return (
     <div className="p-24 max-w-4xl w-full">
       <h2 className="mb-16">{!isEdit ? 'Crear Shark Attack' : 'Editar Shark Attack'}</h2>
@@ -164,6 +215,66 @@ function SharkAttack(props) {
                 Cancelar
               </Button>
             </div>
+
+            {/* ====== Parte 3: Botón + Loading + Lista ====== */}
+            <Divider className="my-16" />
+            <div className="flex items-center gap-12">
+              <Button
+                variant="contained"
+                onClick={handleConsultRelated}
+                disabled={relatedLoading || !((form.country || '').trim())}
+              >
+                {'Consultar más casos en ' + (form.country ? form.country : 'País')}
+              </Button>
+              {relatedLoading && (
+                <div style={{ flex: 1 }}>
+                  <LinearProgress />
+                </div>
+              )}
+            </div>
+
+            {relatedError ? (
+              <Typography color="error" className="mt-8">
+                {relatedError}
+              </Typography>
+            ) : null}
+
+            {related.length > 0 && (
+              <div className="mt-12">
+                <Typography variant="subtitle1" className="mb-8">
+                  Casos relacionados:
+                </Typography>
+                <Paper variant="outlined">
+                  <List dense>
+                    {related.map((r, idx) => {
+                      const line1Parts = [];
+                      if (r.date) line1Parts.push('Fecha: ' + r.date);
+                      if (r.country) line1Parts.push('País: ' + r.country);
+                      const line1 = line1Parts.join(' · ');
+
+                      const line2Parts = [];
+                      if (r.type) line2Parts.push('Tipo: ' + r.type);
+                      if (r.species) line2Parts.push('Especie: ' + r.species);
+                      const line2 = line2Parts.join(' · ');
+
+                      const keyVal = (r.original_order != null) ? String(r.original_order) : String(idx);
+
+                      return (
+                        <React.Fragment key={keyVal}>
+                          <ListItem>
+                            <ListItemText
+                              primary={line1 || 'Caso'}
+                              secondary={line2 || null}
+                            />
+                          </ListItem>
+                          {idx < related.length - 1 && <Divider component="li" />}
+                        </React.Fragment>
+                      );
+                    })}
+                  </List>
+                </Paper>
+              </div>
+            )}
           </form>
         </Paper>
       )}
