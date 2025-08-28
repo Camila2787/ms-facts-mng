@@ -20,36 +20,28 @@ const WRITE_ROLES = ["SHARK_ATTACK_WRITE"];
 const REQUIRED_ATTRIBUTES = [];
 const MATERIALIZED_VIEW_TOPIC = "emi-gateway-materialized-view-updates";
 
-/**
- * Singleton instance
- * @type { SharkAttackCRUD }
- */
-let instance;
+// ---- Helpers para importación ----
+const IMPORT_URL =
+  'https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/global-shark-attack/records?limit=100';
 
-/** GET JSON helper (nativo) */
-function fetchJson$(url) {
+function fetchJson(url) {
   return new Promise((resolve, reject) => {
-    https
-      .get(url, res => {
-        let data = '';
-        res.on('data', chunk => (data += chunk));
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            reject(e);
-          }
-        });
-      })
-      .on('error', reject);
+    https.get(url, res => {
+      let data = '';
+      res.on('data', chunk => (data += chunk));
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
+      });
+    }).on('error', reject);
   });
 }
 
-/** Mapea record externo → documento de nuestra colección */
-function mapRecordToEntity(rec) {
-  rec = rec || {};
+function recordToEntity(r, organizationId) {
+  // Soporta tanto {results:[...]} como {records:[{record:{fields}}]}
+  const rec = (r && r.record && r.record.fields) ? r.record.fields : r || {};
   return {
-    _id: String(rec.original_order), // requisito del entregable
+    _id: String(rec.original_order),
+    organizationId,
     date: rec.date,
     year: rec.year,
     type: rec.type,
@@ -69,17 +61,22 @@ function mapRecordToEntity(rec) {
     href_formula: rec.href_formula,
     href: rec.href,
     case_number: rec.case_number,
-    case_number0: rec.case_number0
+    case_number0: rec.case_number0,
+    active: true,
   };
 }
+
+/**
+ * Singleton instance
+ * @type { SharkAttackCRUD }
+ */
+let instance;
 
 class SharkAttackCRUD {
   constructor() {}
 
   /**     
    * Generates and returns an object that defines the CQRS request handlers.
-   * 
-   * The map is a relationship of: AGGREGATE_TYPE VS { MESSAGE_TYPE VS  { fn: rxjsFunction, instance: invoker_instance } }
    */
   generateRequestProcessorMap() {
     return {
@@ -89,15 +86,14 @@ class SharkAttackCRUD {
         "emigateway.graphql.mutation.FactsMngCreateSharkAttack": { fn: instance.createSharkAttack$, instance, jwtValidation: { roles: WRITE_ROLES, attributes: REQUIRED_ATTRIBUTES } },
         "emigateway.graphql.mutation.FactsMngUpdateSharkAttack": { fn: instance.updateSharkAttack$, jwtValidation: { roles: WRITE_ROLES, attributes: REQUIRED_ATTRIBUTES } },
         "emigateway.graphql.mutation.FactsMngDeleteSharkAttacks": { fn: instance.deleteSharkAttacks$, jwtValidation: { roles: WRITE_ROLES, attributes: REQUIRED_ATTRIBUTES } },
-        // >>> IMPORTACIÓN MASIVA (PARTE 2)
+
+        // 🚀 Mutación de importación (PARTE 2)
         "emigateway.graphql.mutation.FactsMngImportSharkAttacks": { fn: instance.importSharkAttacks$, instance, jwtValidation: { roles: WRITE_ROLES, attributes: REQUIRED_ATTRIBUTES } },
       }
     }
   };
 
-  /**  
-   * Gets the SharkAttack list
-   */
+  // ---------- LISTING ----------
   getFactsMngSharkAttackListing$({ args }, authToken) {
     const { filterInput, paginationInput, sortInput } = args;
     const { queryTotalResultCount = false } = paginationInput || {};
@@ -112,9 +108,7 @@ class SharkAttackCRUD {
     );
   }
 
-  /**  
-   * Gets the get SharkAttack by id
-   */
+  // ---------- GET ----------
   getSharkAttack$({ args }, authToken) {
     const { id, organizationId } = args;
     return SharkAttackDA.getSharkAttack$(id, organizationId).pipe(
@@ -123,22 +117,16 @@ class SharkAttackCRUD {
     );
   }
 
-  /**
-  * Create a SharkAttack
-  */
+  // ---------- CREATE ----------
   createSharkAttack$({ root, args, jwt }, authToken) {
-    const originalOrder = args && args.input ? args.input.original_order : undefined;
+    const originalOrder = args?.input?.original_order;
     const aggregateId = (originalOrder !== undefined && originalOrder !== null)
       ? String(originalOrder)
       : uuidv4();
 
     const input = { ...args.input };
-    if (typeof input.active === 'undefined') {
-      input.active = true;
-    }
-    if (!input._id) {
-      input._id = aggregateId;
-    }
+    if (typeof input.active === 'undefined') { input.active = true; }
+    if (!input._id) { input._id = aggregateId; }
 
     return SharkAttackDA.createSharkAttack$(aggregateId, input, authToken.preferred_username).pipe(
       mergeMap(aggregate => forkJoin(
@@ -154,9 +142,7 @@ class SharkAttackCRUD {
     )
   }
 
-  /**
-   * updates an SharkAttack 
-   */
+  // ---------- UPDATE ----------
   updateSharkAttack$({ root, args, jwt }, authToken) {
     const { id, input, merge } = args;
 
@@ -171,9 +157,7 @@ class SharkAttackCRUD {
     )
   }
 
-  /**
-   * deletes an SharkAttack
-   */
+  // ---------- DELETE ----------
   deleteSharkAttacks$({ root, args, jwt }, authToken) {
     const { ids } = args;
     return forkJoin(
@@ -193,59 +177,57 @@ class SharkAttackCRUD {
     );
   }
 
-  /**
-   * IMPORTACIÓN MASIVA (Parte 2)
-   * - Consume OpenDataSoft (100 registros)
-   * - Usa original_order como _id
-   * - Inserta/upserta
-   * - Emite evento ES (AggregateType=SharkAttact, EventType=Reported)
-   * - Devuelve [ids]
-   */
-  importSharkAttacks$() {
-    const URL = 'https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/global-shark-attack/records?limit=100';
+  // ---------- IMPORT (PARTE 2) ----------
+  importSharkAttacks$({ root, args, jwt }, authToken) {
+    // ⚠️ IMPORTANTE: pon aquí el mismo organizationId que usa tu usuario en el front
+    // Puedes setearlo por env: export DEFAULT_ORG_ID=<tu_org_id>
+    const organizationId =
+      process.env.DEFAULT_ORG_ID ||
+      // si tu JWT trae un claim con la org, ajústalo aquí:
+      authToken?.organizationId ||
+      "ORG-DEFAULT";
 
-    return from(fetchJson$(URL)).pipe(
-      map(function (body) {
-        return (body && Array.isArray(body.results)) ? body.results : [];
-      }),
-      mergeMap(function (results) { return from(results); }),
-      map(mapRecordToEntity),
-      mergeMap(function (doc) {
-        // Inserta si no existe
-        return SharkAttackDA.createIfNotExists$(doc).pipe(
-          // Evento de dominio (Event Sourcing)
-          mergeMap(function () {
-            const ev = new Event({
-              eventType: 'Reported',
-              eventTypeVersion: 1,
-              aggregateType: 'SharkAttact',   // OJO: exactamente así lo pide el criterio
-              aggregateId: doc._id,
-              data: doc,
-              user: 'system-import'
-            });
-            return eventSourcing.emitEvent$(ev, { autoAcknowledgeKey: process.env.MICROBACKEND_KEY });
-          }),
-          map(function () { return doc._id; }),
-          catchError(function (err) {
-            // Si es duplicado, devolvemos el id igual
-            if (err && (err.code === 11000 || err.name === 'MongoError')) {
-              return of(doc._id);
-            }
-            throw err;
-          })
-        );
-      }),
-      toArray(),
-      mergeMap(function (ids) { return CqrsResponseHelper.buildSuccessResponse$(ids); }),
-      catchError(function (err) {
-        return iif(function () { return err.name === 'MongoTimeoutError'; }, throwError(err), CqrsResponseHelper.handleError$(err));
-      })
+    return from(fetchJson(IMPORT_URL)).pipe(
+      mergeMap(raw => from((raw && (raw.results || raw.records)) || [])),
+      map(rec => recordToEntity(rec, organizationId)),
+      mergeMap(entity =>
+        // Insertar; si ya existe, actualizar
+        SharkAttackDA.createSharkAttack$(entity._id, entity, authToken.preferred_username).pipe(
+          catchError(err =>
+            (err && err.code === 11000)
+              ? SharkAttackDA.updateSharkAttack$(entity._id, entity, authToken.preferred_username)
+              : throwError(err)
+          ),
+          mergeMap(saved =>
+            forkJoin(
+              // Evento de modificación estándar (mantiene MV en sync)
+              eventSourcing.emitEvent$(
+                instance.buildAggregateMofifiedEvent('CREATE', 'SharkAttack', entity._id, authToken, saved),
+                { autoAcknowledgeKey: process.env.MICROBACKEND_KEY }
+              ),
+              // ✅ Evento SOLICITADO por el entregable
+              eventSourcing.emitEvent$(new Event({
+                eventType: 'Reported',
+                eventTypeVersion: 1,
+                aggregateType: 'SharkAttact', // tal cual lo pide el criterio (con esa grafía)
+                aggregateId: entity._id,
+                data: saved,
+                user: authToken.preferred_username
+              }), { autoAcknowledgeKey: process.env.MICROBACKEND_KEY }),
+              // Notificación para refrescar el front
+              broker.send$(MATERIALIZED_VIEW_TOPIC, `FactsMngSharkAttackModified`, saved)
+            ).pipe(map(() => saved && (saved._id || saved.id || entity._id)))
+          )
+        )
+      ),
+      toArray(), // -> [ids]
+      mergeMap(ids => CqrsResponseHelper.buildSuccessResponse$(ids)),
+      catchError(err => CqrsResponseHelper.handleError$(err))
     );
   }
 
   /**
    * Generate an Modified event 
-   * @param {string} modType 'CREATE' | 'UPDATE' | 'DELETE'
    */
   buildAggregateMofifiedEvent(modType, aggregateType, aggregateId, authToken, data) {
     return new Event({
@@ -253,10 +235,7 @@ class SharkAttackCRUD {
       eventTypeVersion: 1,
       aggregateType: aggregateType,
       aggregateId,
-      data: {
-        modType,
-        ...data
-      },
+      data: { modType, ...data },
       user: authToken.preferred_username
     })
   }
