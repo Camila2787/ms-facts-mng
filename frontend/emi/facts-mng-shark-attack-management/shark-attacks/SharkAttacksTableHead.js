@@ -5,151 +5,130 @@ import clsx from 'clsx';
 import { useDispatch, useSelector } from 'react-redux';
 import * as Actions from 'app/store/actions';
 import { makeStyles } from '@material-ui/styles';
-import { MDText } from 'i18n-react';
-import i18n from "../i18n";
-
-
-
 
 const useStyles = makeStyles(theme => ({
-    actionsButtonWrapper: {
-        background: theme.palette.background.paper
-    }
+  actionsButtonWrapper: {
+    background: theme.palette.background.paper
+  }
 }));
 
 function SharkAttacksTableHead(props) {
-    const dispatch = useDispatch();
-    const order = useSelector(({ SharkAttackManagement }) => SharkAttackManagement.sharkAttacks.order);
-    const user = useSelector(({ auth }) => auth.user);
-    let T = new MDText(i18n.get(user.locale));
-    const classes = useStyles(props);
-    const [selectedSharkAttacksMenu, setSelectedSharkAttacksMenu] = useState(null);
+  const dispatch = useDispatch();
+  const order = useSelector(({ SharkAttackManagement }) => SharkAttackManagement.sharkAttacks.order);
+  const classes = useStyles(props);
+  const [selectedSharkAttacksMenu, setSelectedSharkAttacksMenu] = useState(null);
 
+  const rows = [
+    { id: 'date', align: 'left', disablePadding: false, label: 'Fecha', sort: true },
+    { id: 'country', align: 'left', disablePadding: false, label: 'País', sort: true },
+    { id: 'type', align: 'left', disablePadding: false, label: 'Tipo', sort: true },
+    { id: 'species', align: 'left', disablePadding: false, label: 'Especie', sort: true },
+  ];
 
-    const rows = [
-        {
-            id: 'name',
-            align: 'left',
-            disablePadding: false,
-            label: T.translate("shark_attacks.table_colums.name"),
-            sort: true
-        },
-        {
-            id: 'active',
-            align: 'right',
-            disablePadding: false,
-            label: T.translate("shark_attacks.table_colums.active"),
-            sort: true
-        }
-    ];
+  const createSortHandler = property => event => {
+    props.onRequestSort(event, property);
+  };
 
-    const createSortHandler = property => event => {
-        props.onRequestSort(event, property);
-    };
+  const removeHandler = () => {
+    props.onRequestRemove();
+  };
 
-    const removeHandler = () => {
-        props.onRequestRemove();
-    };
+  function openSelectedSharkAttacksMenu(event) {
+    setSelectedSharkAttacksMenu(event.currentTarget);
+  }
 
-    function openSelectedSharkAttacksMenu(event) {
-        setSelectedSharkAttacksMenu(event.currentTarget);
-    }
+  function closeSelectedSharkAttacksMenu() {
+    setSelectedSharkAttacksMenu(null);
+  }
 
-    function closeSelectedSharkAttacksMenu() {
-        setSelectedSharkAttacksMenu(null);
-    }
-
-    return (
-        <TableHead>
-            <TableRow className="h-64">
-                <TableCell padding="checkbox" className="relative pl-4 sm:pl-12">
-                    <Checkbox
-                        indeterminate={props.numSelected > 0 && props.numSelected < props.rowCount}
-                        checked={props.numSelected === props.rowCount}
-                        onChange={props.onSelectAllClick}
-                    />
-                    {props.numSelected > 0 && (
-                        <div className={clsx("flex items-center justify-center absolute w-64 top-0 left-0 ml-68 h-64 z-10", classes.actionsButtonWrapper)}>
-                            <IconButton
-                                aria-owns={selectedSharkAttacksMenu ? 'selectedSharkAttacksMenu' : null}
-                                aria-haspopup="true"
-                                onClick={openSelectedSharkAttacksMenu}
-                            >
-                                <Icon>more_horiz</Icon>
-                            </IconButton>
-                            <Menu
-                                id="selectedSharkAttacksMenu"
-                                anchorEl={selectedSharkAttacksMenu}
-                                open={Boolean(selectedSharkAttacksMenu)}
-                                onClose={closeSelectedSharkAttacksMenu}
-                            >
-                                <MenuList>
-                                    <MenuItem
-                                        onClick={() => dispatch(Actions.openDialog({
-                                            children: (
-                                                <React.Fragment>
-                                                    <DialogTitle id="alert-dialog-title">{T.translate("shark_attacks.remove_dialog_title")}</DialogTitle>
-                                                    <DialogContent>
-                                                        <DialogContentText id="alert-dialog-description">
-                                                            {T.translate("shark_attacks.remove_dialog_description")}
-                                                        </DialogContentText>
-                                                    </DialogContent>
-                                                    <DialogActions>
-                                                        <Button onClick={() => { dispatch(Actions.closeDialog()); closeSelectedSharkAttacksMenu() }} color="primary">
-                                                            {T.translate("shark_attacks.remove_dialog_no")}
-                                                        </Button>
-                                                        <Button onClick={() => { dispatch(Actions.closeDialog()); closeSelectedSharkAttacksMenu(); removeHandler() }} color="primary" autoFocus>
-                                                            {T.translate("shark_attacks.remove_dialog_yes")}
-                                                        </Button>
-                                                    </DialogActions>
-                                                </React.Fragment>
-                                            )
-                                        }))}
-                                    >
-
-                                        <ListItemIcon className="min-w-40">
-                                            <Icon>delete</Icon>
-                                        </ListItemIcon>
-                                        <ListItemText primary={T.translate("shark_attacks.remove")} />
-
-                                    </MenuItem>
-                                </MenuList>
-                            </Menu>
-                        </div>
-                    )}
-                </TableCell>
-                {rows.map(row => {
-                    return (
-                        <TableCell
-                            key={row.id}
-                            align={row.align}
-                            padding={row.disablePadding ? 'none' : 'default'}
-                            sortDirection={order.id === row.id ? order.direction : false}
-                        >
-                            {row.sort && (
-                                <Tooltip
-                                    title="Sort"
-                                    placement={row.align === "right" ? 'bottom-end' : 'bottom-start'}
-                                    enterDelay={300}
-                                >
-                                    <TableSortLabel
-                                        active={order.id === row.id}
-                                        direction={order.direction}
-                                        onClick={createSortHandler(row.id)}
-                                    >
-                                        {row.label}
-                                    </TableSortLabel>
-                                </Tooltip>
-                            )}
-                            {!row.sort && (
-                                row.label
-                            )}
-                        </TableCell>
-                    );
-                }, this)}
-            </TableRow>
-        </TableHead>
-    );
+  return (
+    <TableHead>
+      <TableRow className="h-64">
+        <TableCell padding="checkbox" className="relative pl-4 sm:pl-12">
+          <Checkbox
+            indeterminate={props.numSelected > 0 && props.numSelected < props.rowCount}
+            checked={props.numSelected === props.rowCount}
+            onChange={props.onSelectAllClick}
+          />
+          {props.numSelected > 0 && (
+            <div className={clsx("flex items-center justify-center absolute w-64 top-0 left-0 ml-68 h-64 z-10", classes.actionsButtonWrapper)}>
+              <IconButton
+                aria-owns={selectedSharkAttacksMenu ? 'selectedSharkAttacksMenu' : null}
+                aria-haspopup="true"
+                onClick={openSelectedSharkAttacksMenu}
+              >
+                <Icon>more_horiz</Icon>
+              </IconButton>
+              <Menu
+                id="selectedSharkAttacksMenu"
+                anchorEl={selectedSharkAttacksMenu}
+                open={Boolean(selectedSharkAttacksMenu)}
+                onClose={closeSelectedSharkAttacksMenu}
+              >
+                <MenuList>
+                  <MenuItem
+                    onClick={() => dispatch(Actions.openDialog({
+                      children: (
+                        <React.Fragment>
+                          <DialogTitle id="alert-dialog-title">Eliminar</DialogTitle>
+                          <DialogContent>
+                            <DialogContentText id="alert-dialog-description">
+                              ¿Seguro que deseas eliminar los elementos seleccionados?
+                            </DialogContentText>
+                          </DialogContent>
+                          <DialogActions>
+                            <Button onClick={() => { dispatch(Actions.closeDialog()); closeSelectedSharkAttacksMenu() }} color="primary">
+                              No
+                            </Button>
+                            <Button onClick={() => { dispatch(Actions.closeDialog()); closeSelectedSharkAttacksMenu(); removeHandler() }} color="primary" autoFocus>
+                              Sí, eliminar
+                            </Button>
+                          </DialogActions>
+                        </React.Fragment>
+                      )
+                    }))}
+                  >
+                    <ListItemIcon className="min-w-40">
+                      <Icon>delete</Icon>
+                    </ListItemIcon>
+                    <ListItemText primary="Eliminar" />
+                  </MenuItem>
+                </MenuList>
+              </Menu>
+            </div>
+          )}
+        </TableCell>
+        {rows.map(row => {
+          return (
+            <TableCell
+              key={row.id}
+              align={row.align}
+              padding={row.disablePadding ? 'none' : 'default'}
+              sortDirection={order.id === row.id ? order.direction : false}
+            >
+              {row.sort ? (
+                <Tooltip
+                  title="Sort"
+                  placement={row.align === "right" ? 'bottom-end' : 'bottom-start'}
+                  enterDelay={300}
+                >
+                  <TableSortLabel
+                    active={order.id === row.id}
+                    direction={order.direction}
+                    onClick={createSortHandler(row.id)}
+                  >
+                    {row.label}
+                  </TableSortLabel>
+                </Tooltip>
+              ) : (
+                row.label
+              )}
+            </TableCell>
+          );
+        })}
+      </TableRow>
+    </TableHead>
+  );
 }
 
 export default SharkAttacksTableHead;

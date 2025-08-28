@@ -90,6 +90,19 @@ module.exports = {
         FactsMngDeleteSharkAttacks(root, args, context) {
             return sendToBackEndHandler$(root, args, context, WRITE_ROLES, 'mutation', 'SharkAttack', 'FactsMngDeleteSharkAttacks').toPromise();
         },
+        FactsMngImportSharkAttacks(root, args, context) {
+  return sendToBackEndHandler$(
+    root,
+    args,
+    context,
+    WRITE_ROLES,
+    'mutation',
+    'SharkAttack',
+    'FactsMngImportSharkAttacks',
+    20000
+  ).toPromise();
+},
+
     },
 
     //// SUBSCRIPTIONS ///////

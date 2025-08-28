@@ -1,0 +1,179 @@
+.
+├── api
+│   └── emi-gateway
+│       └── graphql
+│           ├── facts-mng-shark-attack-management
+│           │   ├── resolvers.js
+│           │   └── schema.gql
+│           └── organization-mng-organization-management
+│               ├── resolvers.js
+│               └── schema.gql
+├── backend
+│   ├── facts-mng
+│   │   ├── bin
+│   │   │   ├── domain
+│   │   │   │   ├── index.js
+│   │   │   │   └── shark-attack
+│   │   │   ├── entry-point
+│   │   │   │   ├── get_ready.js
+│   │   │   │   ├── server.js
+│   │   │   │   └── sync_state.js
+│   │   │   ├── services
+│   │   │   │   ├── cqrs-service
+│   │   │   │   ├── event-store-service
+│   │   │   │   └── index.js
+│   │   │   └── tools
+│   │   │       ├── event-sourcing
+│   │   │       ├── index.js
+│   │   │       └── mongo-db
+│   │   ├── Dockerfile
+│   │   ├── entrypoint.sh
+│   │   ├── package.json
+│   │   └── package-lock.json
+│   └── package-lock.json
+├── deployment
+│   └── gke
+│       ├── deployment-facts-mng-mongo.yaml
+│       └── deployment-facts-mng.yaml
+├── docs
+│   ├── images
+│   │   ├── ms-dashboard-devices_intro.png
+│   │   ├── ms-devices-location-dev-env.png
+│   │   └── nebula.png
+│   └── resources
+│       └── keycloakRealmToImport.json
+├── estructura.txt
+├── etc
+│   ├── mapi-setup.json
+│   └── mfe-setup.json
+├── frontend
+│   └── emi
+│       └── facts-mng-shark-attack-management
+│           ├── assets
+│           │   └── facts-mng-shark-attack-management
+│           ├── gql
+│           │   └── SharkAttack.js
+│           ├── i18n
+│           │   ├── en.js
+│           │   ├── es.js
+│           │   └── index.js
+│           ├── MicroFrontendConfig.js
+│           ├── shark-attack
+│           │   ├── SharkAttack.js
+│           │   └── tabs
+│           ├── shark-attacks
+│           │   ├── SharkAttacksFilterContent.js
+│           │   ├── SharkAttacksFilterHeader.js
+│           │   ├── SharkAttacksHeader.js
+│           │   ├── SharkAttacks.js
+│           │   ├── SharkAttacksTableHead.js
+│           │   └── SharkAttacksTable.js
+│           └── store
+│               ├── actions
+│               └── reducers
+├── LICENSE
+├── playground
+│   ├── docker-compose.yml
+│   ├── emi
+│   │   ├── CREDITS
+│   │   ├── dev-playground-sync.js
+│   │   ├── Dockerfile
+│   │   ├── jsconfig.json
+│   │   ├── LICENSE
+│   │   ├── nginx.conf
+│   │   ├── package.json
+│   │   ├── package-lock.json
+│   │   ├── public
+│   │   │   ├── assets
+│   │   │   │   ├── docs
+│   │   │   │   ├── fonts
+│   │   │   │   ├── images
+│   │   │   │   ├── mfe
+│   │   │   │   ├── sounds
+│   │   │   │   └── widget
+│   │   │   ├── favicon.ico
+│   │   │   ├── index.html
+│   │   │   ├── manifest.json
+│   │   │   └── material-ui-static
+│   │   │       ├── brand.png
+│   │   │       ├── carbon.png
+│   │   │       ├── favicon.ico
+│   │   │       ├── icons
+│   │   │       ├── images
+│   │   │       ├── logo.png
+│   │   │       └── manifest.json
+│   │   ├── purge-tailwindcss.js
+│   │   ├── README.md
+│   │   ├── src
+│   │   │   ├── app
+│   │   │   │   ├── AppContext.js
+│   │   │   │   ├── App.js
+│   │   │   │   ├── auth
+│   │   │   │   ├── fuse-configs
+│   │   │   │   ├── fuse-layouts
+│   │   │   │   ├── main
+│   │   │   │   ├── services
+│   │   │   │   └── store
+│   │   │   ├── @fuse
+│   │   │   │   ├── components
+│   │   │   │   ├── fuse-colors
+│   │   │   │   ├── FuseDefaultSettings.js
+│   │   │   │   ├── FuseUtils.js
+│   │   │   │   ├── hooks
+│   │   │   │   └── index.js
+│   │   │   ├── @history.js
+│   │   │   ├── index.js
+│   │   │   ├── @lodash
+│   │   │   │   └── index.js
+│   │   │   ├── react-chartjs-2-defaults.js
+│   │   │   ├── react-table-defaults.js
+│   │   │   ├── serviceWorker.js
+│   │   │   └── styles
+│   │   │       ├── index.css
+│   │   │       ├── normalize.css
+│   │   │       ├── print.css
+│   │   │       ├── prism.css
+│   │   │       ├── react-table.css
+│   │   │       ├── tables.css
+│   │   │       ├── tailwind.base.css
+│   │   │       └── tailwind.css
+│   │   ├── tailwind.js
+│   │   ├── webpack.config
+│   │   └── yarn.lock
+│   ├── emi-gateway
+│   │   ├── broker
+│   │   │   ├── BrokerFactory.js
+│   │   │   ├── MqttBroker.js
+│   │   │   └── PubSubBroker.js
+│   │   ├── Dockerfile
+│   │   ├── graphql
+│   │   │   ├── default
+│   │   │   │   ├── resolvers.js
+│   │   │   │   └── schema.gql
+│   │   │   ├── facts-mng-shark-attack-management
+│   │   │   │   ├── resolvers.js
+│   │   │   │   └── schema.gql
+│   │   │   ├── index.js
+│   │   │   ├── organization-mng-organization-management
+│   │   │   │   ├── resolvers.js
+│   │   │   │   └── schema.gql
+│   │   │   └── sample
+│   │   │       ├── resolvers.js
+│   │   │       └── schema.gql
+│   │   ├── gulpfile.js
+│   │   ├── package.json
+│   │   ├── package-lock.json
+│   │   ├── server.js
+│   │   ├── test
+│   │   │   └── broker
+│   │   │       ├── MqttBroker.js
+│   │   │       └── PubSubBroker.js
+│   │   └── tools
+│   │       ├── customError.js
+│   │       ├── GraphqlResponseTools.js
+│   │       └── RoleValidator.js
+│   ├── generate_playground.sh
+│   └── nats-server.conf
+└── README.md
+
+74 directories, 103 files

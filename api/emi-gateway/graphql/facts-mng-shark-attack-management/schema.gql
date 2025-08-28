@@ -8,32 +8,48 @@ type CommandResponse {
 type FactsMngSharkAttack {
   "SharkAttack ID"
   id: ID!
-  "name"
-  name: String!
-  "organization id"
-  organizationId: String!
-  "SharkAttack description"
+  # ---- Campos del entregable ----
+  date: String
+  year: String
+  type: String
+  country: String
+  area: String
+  location: String
+  activity: String
+  name: String
+  sex: String
+  age: String
+  injury: String
+  fatal_y_n: String
+  time: String
+  species: String
+  investigator_or_source: String
+  pdf: String
+  href_formula: String
+  href: String
+  case_number: String
+  case_number0: String
+  # ---- Campos previos (compat) ----
+  organizationId: String
   description: String
-  "SharkAttack active flag"
-  active: Boolean!  
+  active: Boolean
   "object metadata"
   metadata: FactsMngSharkAttackMetadata
 }
 
 type FactsMngSharkAttackMetadata {
-    createdBy: String
-		createdAt: BigInt
-		updatedBy: String
-		updatedAt: BigInt
+  createdBy: String
+  createdAt: BigInt
+  updatedBy: String
+  updatedAt: BigInt
 }
 
 type FactsMngSharkAttackListing {
   "Listing"
   listing: [FactsMngSharkAttack]
   "query total result count"
-  queryTotalResultCount: Int,  
+  queryTotalResultCount: Int
 }
-
 
 input FactsMngSharkAttackFilterInput {
   "Name"
@@ -54,25 +70,45 @@ input FactsMngSharkAttackPaginationInput {
 }
 
 input FactsMngSharkAttackSortInput {
-  field: String!,
-  asc: Boolean!,
+  field: String!
+  asc: Boolean!
 }
 
 input FactsMngSharkAttackInput {
-  "name"
+  # ---- Campos del entregable ----
+  date: String
+  year: String
+  type: String
+  country: String
+  area: String
+  location: String
+  activity: String
   name: String
-  "organization id"
+  sex: String
+  age: String
+  injury: String
+  fatal_y_n: String
+  time: String
+  species: String
+  investigator_or_source: String
+  pdf: String
+  href_formula: String
+  href: String
+  case_number: String
+  case_number0: String
+  # ---- Campos previos (compat) ----
   organizationId: String!
-  "SharkAttack description"
   description: String
-  "SharkAttack active flag"
   active: Boolean
 }
 
-
 type Query {
   "Get SharkAttacks filtered "
-  FactsMngSharkAttackListing(filterInput: FactsMngSharkAttackFilterInput, paginationInput: FactsMngSharkAttackPaginationInput, sortInput: FactsMngSharkAttackSortInput): FactsMngSharkAttackListing
+  FactsMngSharkAttackListing(
+    filterInput: FactsMngSharkAttackFilterInput
+    paginationInput: FactsMngSharkAttackPaginationInput
+    sortInput: FactsMngSharkAttackSortInput
+  ): FactsMngSharkAttackListing
   "Get SharkAttack by its id"
   FactsMngSharkAttack(id: ID!, organizationId: String!): FactsMngSharkAttack
 }
@@ -81,13 +117,17 @@ type Mutation {
   "Create a new SharkAttack"
   FactsMngCreateSharkAttack(input: FactsMngSharkAttackInput!): FactsMngSharkAttack
   "Update an SharkAttack"
-  FactsMngUpdateSharkAttack(id: ID!, input: FactsMngSharkAttackInput!, merge: Boolean!): FactsMngSharkAttack  
+  FactsMngUpdateSharkAttack(id: ID!, input: FactsMngSharkAttackInput!, merge: Boolean!): FactsMngSharkAttack
   "Deletes an SharkAttack"
-  FactsMngDeleteSharkAttacks(ids: [ID]!): CommandResponse  
+  FactsMngDeleteSharkAttacks(ids: [ID]!): CommandResponse
 }
-
 
 type Subscription {
   "This events is triggered when a sharkAttack updated or deleted"
   FactsMngSharkAttackModified(id: ID!): FactsMngSharkAttack
+}
+
+# Importación masiva de ataques
+extend type Mutation {
+  FactsMngImportSharkAttacks: [ID!]!
 }

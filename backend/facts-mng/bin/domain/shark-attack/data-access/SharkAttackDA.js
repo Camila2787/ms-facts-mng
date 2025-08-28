@@ -2,7 +2,7 @@
 
 let mongoDB = undefined;
 const { map, mapTo } = require("rxjs/operators");
-const { of, Observable, defer } = require("rxjs");
+const { of, Observable, defer, from } = require("rxjs");
 
 const { CustomError } = require("@nebulae/backend-node-tools").error;
 
@@ -59,8 +59,9 @@ class SharkAttackDA {
     const collection = mongoDB.db.collection(CollectionName);
     const { page = 0, count = 10 } = pagination;
 
-    const query = this.generateListingQuery(filter);    
-    const projection = { name: 1, active: 1 };
+    const query = this.generateListingQuery(filter);
+    // Proyecta las 4 columnas pedidas por el entregable
+    const projection = { date: 1, country: 1, type: 1, species: 1 };
 
     let cursor = collection
       .find(query, { projection })
@@ -75,7 +76,6 @@ class SharkAttackDA {
     }
     cursor = cursor.sort(sort);
 
-
     return mongoDB.extractAllFromMongoCursor$(cursor).pipe(
       map(res => ({ ...res, id: res._id }))
     );
@@ -83,7 +83,7 @@ class SharkAttackDA {
 
   static getSharkAttackSize$(filter = {}) {
     const collection = mongoDB.db.collection(CollectionName);
-    const query = this.generateListingQuery(filter);    
+    const query = this.generateListingQuery(filter);
     return defer(() => collection.countDocuments(query));
   }
 
@@ -93,7 +93,6 @@ class SharkAttackDA {
   * @param {*} SharkAttack properties
   */
   static createSharkAttack$(_id, properties, createdBy) {
-
     const metadata = { createdBy, createdAt: Date.now(), updatedBy: createdBy, updatedAt: Date.now() };
     const collection = mongoDB.db.collection(CollectionName);
     return defer(() => collection.insertOne({
@@ -102,6 +101,20 @@ class SharkAttackDA {
       metadata,
     })).pipe(
       map(({ insertedId }) => ({ id: insertedId, ...properties, metadata }))
+    );
+  }
+
+  /**
+  * Upsert SOLO si no existe (para import masivo)
+  */
+  static createIfNotExists$(doc) {
+    const collection = mongoDB.db.collection(CollectionName);
+    return defer(() =>
+      collection.updateOne(
+        { _id: doc._id },
+        { $setOnInsert: { ...doc, metadata: { createdBy: 'system-import', createdAt: Date.now(), updatedBy: 'system-import', updatedAt: Date.now() } } },
+        { upsert: true }
+      )
     );
   }
 
@@ -131,17 +144,13 @@ class SharkAttackDA {
   }
 
   /**
-  * modifies the SharkAttack properties
-  * @param {String} id  SharkAttack ID
-  * @param {*} SharkAttack properties to update
+  * modifies the SharkAttack properties (recovery)
   */
   static updateSharkAttackFromRecovery$(_id, properties, av) {
     const collection = mongoDB.db.collection(CollectionName);
     return defer(() =>
       collection.updateOne(
-        {
-          _id,
-        },
+        { _id },
         { $set: { ...properties } },
         {
           returnOriginal: false,
@@ -154,9 +163,7 @@ class SharkAttackDA {
   }
 
   /**
-  * modifies the SharkAttack properties
-  * @param {String} id  SharkAttack ID
-  * @param {*} SharkAttack properties to update
+  * replaces the SharkAttack properties
   */
   static replaceSharkAttack$(_id, properties) {
     const collection = mongoDB.db.collection(CollectionName);
@@ -172,7 +179,6 @@ class SharkAttackDA {
 
   /**
     * deletes an SharkAttack 
-    * @param {*} _id  SharkAttack ID
   */
   static deleteSharkAttack$(_id) {
     const collection = mongoDB.db.collection(CollectionName);
@@ -183,7 +189,6 @@ class SharkAttackDA {
 
   /**
     * deletes multiple SharkAttack at once
-    * @param {*} _ids  SharkAttack IDs array
   */
   static deleteSharkAttacks$(_ids) {
     const collection = mongoDB.db.collection(CollectionName);

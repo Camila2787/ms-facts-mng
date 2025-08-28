@@ -1,6 +1,7 @@
 "use strict";
 
 const uuidv4 = require("uuid/v4");
+const https = require("https");
 const { of, forkJoin, from, iif, throwError } = require("rxjs");
 const { mergeMap, catchError, map, toArray, pluck } = require('rxjs/operators');
 
@@ -25,17 +26,60 @@ const MATERIALIZED_VIEW_TOPIC = "emi-gateway-materialized-view-updates";
  */
 let instance;
 
+/** GET JSON helper (nativo) */
+function fetchJson$(url) {
+  return new Promise((resolve, reject) => {
+    https
+      .get(url, res => {
+        let data = '';
+        res.on('data', chunk => (data += chunk));
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      })
+      .on('error', reject);
+  });
+}
+
+/** Mapea record externo → documento de nuestra colección */
+function mapRecordToEntity(rec) {
+  rec = rec || {};
+  return {
+    _id: String(rec.original_order), // requisito del entregable
+    date: rec.date,
+    year: rec.year,
+    type: rec.type,
+    country: rec.country,
+    area: rec.area,
+    location: rec.location,
+    activity: rec.activity,
+    name: rec.name,
+    sex: rec.sex,
+    age: rec.age,
+    injury: rec.injury,
+    fatal_y_n: rec.fatal_y_n,
+    time: rec.time,
+    species: rec.species,
+    investigator_or_source: rec.investigator_or_source,
+    pdf: rec.pdf,
+    href_formula: rec.href_formula,
+    href: rec.href,
+    case_number: rec.case_number,
+    case_number0: rec.case_number0
+  };
+}
+
 class SharkAttackCRUD {
-  constructor() {
-  }
+  constructor() {}
 
   /**     
    * Generates and returns an object that defines the CQRS request handlers.
    * 
    * The map is a relationship of: AGGREGATE_TYPE VS { MESSAGE_TYPE VS  { fn: rxjsFunction, instance: invoker_instance } }
-   * 
-   * ## Example
-   *  { "CreateUser" : { "somegateway.someprotocol.mutation.CreateUser" : {fn: createUser$, instance: classInstance } } }
    */
   generateRequestProcessorMap() {
     return {
@@ -45,15 +89,14 @@ class SharkAttackCRUD {
         "emigateway.graphql.mutation.FactsMngCreateSharkAttack": { fn: instance.createSharkAttack$, instance, jwtValidation: { roles: WRITE_ROLES, attributes: REQUIRED_ATTRIBUTES } },
         "emigateway.graphql.mutation.FactsMngUpdateSharkAttack": { fn: instance.updateSharkAttack$, jwtValidation: { roles: WRITE_ROLES, attributes: REQUIRED_ATTRIBUTES } },
         "emigateway.graphql.mutation.FactsMngDeleteSharkAttacks": { fn: instance.deleteSharkAttacks$, jwtValidation: { roles: WRITE_ROLES, attributes: REQUIRED_ATTRIBUTES } },
+        // >>> IMPORTACIÓN MASIVA (PARTE 2)
+        "emigateway.graphql.mutation.FactsMngImportSharkAttacks": { fn: instance.importSharkAttacks$, instance, jwtValidation: { roles: WRITE_ROLES, attributes: REQUIRED_ATTRIBUTES } },
       }
     }
   };
 
-
   /**  
    * Gets the SharkAttack list
-   *
-   * @param {*} args args
    */
   getFactsMngSharkAttackListing$({ args }, authToken) {
     const { filterInput, paginationInput, sortInput } = args;
@@ -71,8 +114,6 @@ class SharkAttackCRUD {
 
   /**  
    * Gets the get SharkAttack by id
-   *
-   * @param {*} args args
    */
   getSharkAttack$({ args }, authToken) {
     const { id, organizationId } = args;
@@ -80,24 +121,32 @@ class SharkAttackCRUD {
       mergeMap(rawResponse => CqrsResponseHelper.buildSuccessResponse$(rawResponse)),
       catchError(err => iif(() => err.name === 'MongoTimeoutError', throwError(err), CqrsResponseHelper.handleError$(err)))
     );
-
   }
-
 
   /**
   * Create a SharkAttack
   */
   createSharkAttack$({ root, args, jwt }, authToken) {
-    const aggregateId = uuidv4();
-    const input = {
-      active: false,
-      ...args.input,
-    };
+    const originalOrder = args && args.input ? args.input.original_order : undefined;
+    const aggregateId = (originalOrder !== undefined && originalOrder !== null)
+      ? String(originalOrder)
+      : uuidv4();
+
+    const input = { ...args.input };
+    if (typeof input.active === 'undefined') {
+      input.active = true;
+    }
+    if (!input._id) {
+      input._id = aggregateId;
+    }
 
     return SharkAttackDA.createSharkAttack$(aggregateId, input, authToken.preferred_username).pipe(
       mergeMap(aggregate => forkJoin(
         CqrsResponseHelper.buildSuccessResponse$(aggregate),
-        eventSourcing.emitEvent$(instance.buildAggregateMofifiedEvent('CREATE', 'SharkAttack', aggregateId, authToken, aggregate), { autoAcknowledgeKey: process.env.MICROBACKEND_KEY }),
+        eventSourcing.emitEvent$(
+          instance.buildAggregateMofifiedEvent('CREATE', 'SharkAttack', aggregateId, authToken, aggregate),
+          { autoAcknowledgeKey: process.env.MICROBACKEND_KEY }
+        ),
         broker.send$(MATERIALIZED_VIEW_TOPIC, `FactsMngSharkAttackModified`, aggregate)
       )),
       map(([sucessResponse]) => sucessResponse),
@@ -122,7 +171,6 @@ class SharkAttackCRUD {
     )
   }
 
-
   /**
    * deletes an SharkAttack
    */
@@ -145,15 +193,59 @@ class SharkAttackCRUD {
     );
   }
 
+  /**
+   * IMPORTACIÓN MASIVA (Parte 2)
+   * - Consume OpenDataSoft (100 registros)
+   * - Usa original_order como _id
+   * - Inserta/upserta
+   * - Emite evento ES (AggregateType=SharkAttact, EventType=Reported)
+   * - Devuelve [ids]
+   */
+  importSharkAttacks$() {
+    const URL = 'https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/global-shark-attack/records?limit=100';
+
+    return from(fetchJson$(URL)).pipe(
+      map(function (body) {
+        return (body && Array.isArray(body.results)) ? body.results : [];
+      }),
+      mergeMap(function (results) { return from(results); }),
+      map(mapRecordToEntity),
+      mergeMap(function (doc) {
+        // Inserta si no existe
+        return SharkAttackDA.createIfNotExists$(doc).pipe(
+          // Evento de dominio (Event Sourcing)
+          mergeMap(function () {
+            const ev = new Event({
+              eventType: 'Reported',
+              eventTypeVersion: 1,
+              aggregateType: 'SharkAttact',   // OJO: exactamente así lo pide el criterio
+              aggregateId: doc._id,
+              data: doc,
+              user: 'system-import'
+            });
+            return eventSourcing.emitEvent$(ev, { autoAcknowledgeKey: process.env.MICROBACKEND_KEY });
+          }),
+          map(function () { return doc._id; }),
+          catchError(function (err) {
+            // Si es duplicado, devolvemos el id igual
+            if (err && (err.code === 11000 || err.name === 'MongoError')) {
+              return of(doc._id);
+            }
+            throw err;
+          })
+        );
+      }),
+      toArray(),
+      mergeMap(function (ids) { return CqrsResponseHelper.buildSuccessResponse$(ids); }),
+      catchError(function (err) {
+        return iif(function () { return err.name === 'MongoTimeoutError'; }, throwError(err), CqrsResponseHelper.handleError$(err));
+      })
+    );
+  }
 
   /**
    * Generate an Modified event 
    * @param {string} modType 'CREATE' | 'UPDATE' | 'DELETE'
-   * @param {*} aggregateType 
-   * @param {*} aggregateId 
-   * @param {*} authToken 
-   * @param {*} data 
-   * @returns {Event}
    */
   buildAggregateMofifiedEvent(modType, aggregateType, aggregateId, authToken, data) {
     return new Event({
