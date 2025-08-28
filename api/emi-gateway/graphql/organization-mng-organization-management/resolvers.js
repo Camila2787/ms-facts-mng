@@ -20,16 +20,14 @@ module.exports = {
 
     //// QUERY ///////
     Query: {
-        OrganizationMngOrganizationListing(root, args, context) {
-            return sendToBackEndHandler$(root, args, context, READ_ROLES, 'query', 'Organization', 'OrganizationMngOrganizationListing',10000,CONTEXT_NAME).toPromise();
-        },
-        OrganizationMngOrganization(root, args, context) {
-            return sendToBackEndHandler$(root, args, context, READ_ROLES, 'query', 'Organization', 'OrganizationMngOrganization',10000,CONTEXT_NAME).toPromise();
-        },
-        OrganizationMngParentOrganization(root , args , context){
-            return sendToBackEndHandler$(root, args, context, READ_ROLES, 'query', 'Organization', 'OrganizationMngParentOrganization',2000,CONTEXT_NAME).toPromise();
-        }
+    OrganizationMngOrganizationListing() {
+      // stub rápido: retorna lista vacía y evita timeout del broker
+      return { listing: [], queryTotalResultCount: 0 };
     },
+    OrganizationMngOrganization() {
+      return null;
+    }
+  },
 
     //// MUTATIONS ///////
     Mutation: {

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { TextField, Button, CircularProgress, Paper, Grid } from '@material-ui/core';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import * as Actions from '../store/actions';
 import { withRouter } from 'react-router-dom';
-import { useQuery, useMutation } from '@apollo/react-hooks';
+import { useLazyQuery, useMutation } from '@apollo/react-hooks';
 import {
   FactsMngSharkAttack as GqlGet,
   FactsMngCreateSharkAttack as GqlCreate,
@@ -33,28 +34,49 @@ const FIELD_LIST = [
   ['description', 'Descripción'],
 ];
 
+const defaultData = FIELD_LIST.reduce((acc, [k]) => { acc[k] = ''; return acc; }, {});
+
 function SharkAttack(props) {
-  const { id } = props.match.params;
-  const isEdit = id && id !== 'new';
+  // IMPORTANTE: la ruta usa :sharkAttackId
+  const { sharkAttackId } = props.match.params;
+  const isEdit = sharkAttackId && sharkAttackId !== 'new';
 
-  const user = useSelector(({ auth }) => auth.user);
-  const orgId = user && user.selectedOrganization && user.selectedOrganization.id;
+  const dispatch = useDispatch();
+  const loggedUser = useSelector(({ auth }) => auth.user);
+  const orgId = loggedUser && loggedUser.selectedOrganization && loggedUser.selectedOrganization.id;
 
-  const [form, setForm] = useState(
-    FIELD_LIST.reduce((acc, [k]) => { acc[k] = ''; return acc; }, {})
-  );
+  const [form, setForm] = useState({ ...defaultData });
   const [saving, setSaving] = useState(false);
 
-  const getDef = isEdit ? GqlGet({ id, organizationId: orgId }) : null;
-  const { data, loading } = useQuery(
-    isEdit ? getDef.query : GqlGet({ id: 'skip', organizationId: 'skip' }).query,
-    {
-      variables: isEdit ? getDef.variables : { id: 'skip', organizationId: 'skip' },
-      fetchPolicy: isEdit ? getDef.fetchPolicy : 'cache-first',
-      skip: !isEdit || !orgId,
-    }
+  // LazyQuery para leer detalle cuando el efecto lo indique
+  const [readSharkAttack, { data, loading }] = useLazyQuery(
+    GqlGet({ id: 'placeholder', organizationId: 'placeholder' }).query,
+    { fetchPolicy: 'network-only' }
   );
 
+  // === Efecto solicitado (adaptado) ===
+  useEffect(() => {
+    function updateSharkAttackState() {
+      const { sharkAttackId } = props.match.params;
+
+      if (sharkAttackId !== 'new') {
+        if (loggedUser.selectedOrganization && loggedUser.selectedOrganization.id !== "") {
+          readSharkAttack({
+            variables: {
+              organizationId: loggedUser.selectedOrganization.id,
+              id: sharkAttackId
+            }
+          });
+        }
+      } else if (loggedUser.selectedOrganization && loggedUser.selectedOrganization.id) {
+        setForm({ ...defaultData, organizationId: loggedUser.selectedOrganization.id });
+        dispatch(Actions.setSharkAttacksPage(0));
+      }
+    }
+    updateSharkAttackState();
+  }, [dispatch, props.match.params, loggedUser.selectedOrganization, readSharkAttack]);
+
+  // Cuando llega el detalle desde la query, hidrata el formulario
   useEffect(() => {
     if (isEdit && data && data.FactsMngSharkAttack) {
       const sa = data.FactsMngSharkAttack;
@@ -66,6 +88,7 @@ function SharkAttack(props) {
     }
   }, [isEdit, data]);
 
+  // Mutaciones
   const [doCreate] = useMutation(GqlCreate({}).mutation);
   const [doUpdate] = useMutation(GqlUpdate({}).mutation);
 
@@ -91,7 +114,7 @@ function SharkAttack(props) {
           props.history.push(`/shark-attack-mng/shark-attacks/${created.id}/${slug}`);
         }
       } else {
-        const result = await doUpdate({ variables: { id, input: payload, merge: true } });
+        const result = await doUpdate({ variables: { id: sharkAttackId, input: payload, merge: true } });
         const d = result && result.data;
         const updated = (d && d.FactsMngUpdateSharkAttack) || (d && d.FactsMngUpdateSharkAttacks);
         if (updated && updated.id) {
